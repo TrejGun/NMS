@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Downloaded compilers and archives unpacked from the local game.
+tools/
+work/
+backups/
