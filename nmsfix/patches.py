@@ -8,6 +8,16 @@ SCAN_DELAY = re.compile(
     r'<Property name="StartDelay" value=")6\.000000(" />)',
     re.MULTILINE,
 )
+BRAIN_AERIAL = re.compile(
+    r'(<Property name="Event" value="SE_SHIPBRAIN_CLEANSE" />\s*'
+    r'<Property name="Time" value="[^"]*" />\s*'
+    r'<Property name="DoAerialScan" value=")true(" />)'
+)
+BRAIN_DONE = re.compile(
+    r'<Property name="Event" value="SE_SHIPBRAIN_CLEANSE" />\s*'
+    r'<Property name="Time" value="[^"]*" />\s*'
+    r'<Property name="DoAerialScan" value="false" />'
+)
 PROPERTY_VALUE = re.compile(
     r'(<Property name="{name}" value=")[^"]*(" />)'
 )
@@ -30,6 +40,7 @@ TARGETS = {
     ],
     "NMSARC.Precache.pak": [
         "metadata/reality/tables/rewardtable.mbin",
+        "metadata/simulation/missions/tables/startedonusemissiontable.mbin",
     ],
 }
 
@@ -74,9 +85,26 @@ def check_reward(text):
         raise PatchError("Aerial scan is still enabled in the reward table.")
 
 
+def patch_brain(text):
+    updated, count = BRAIN_AERIAL.subn(r"\1false\2", text, count=1)
+    if count == 0 and not BRAIN_DONE.search(text):
+        raise PatchError("The Hyaline Brain scan was not found in the mission table.")
+    check_brain(updated)
+    return updated
+
+
+def check_brain(text):
+    if not BRAIN_DONE.search(text):
+        raise PatchError("The Hyaline Brain scan still starts the aerial camera.")
+    if BRAIN_AERIAL.search(text):
+        raise PatchError("The Hyaline Brain scan still starts the aerial camera.")
+
+
 PATCHERS["gcuiglobals.global.mbin"] = patch_ui
 PATCHERS["metadata/reality/tables/rewardtable.mbin"] = patch_reward
+PATCHERS["metadata/simulation/missions/tables/startedonusemissiontable.mbin"] = patch_brain
 
 CHECKS = {
     "metadata/reality/tables/rewardtable.mbin": check_reward,
+    "metadata/simulation/missions/tables/startedonusemissiontable.mbin": check_brain,
 }
