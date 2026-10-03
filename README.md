@@ -4,10 +4,11 @@ This patch turns off the camera that flies upward and shows the area when you se
 
 Only data changes:
 
-- `DoAerialScan` is turned off for planetary, star, and settlement charts
+- `DoAerialScan` is turned off for planetary, star, and settlement charts, so those searches never start the fly-up
 - the pause before that search drops from 6 seconds to 0.01
-- if another scene still calls this camera, the pull-back distance is 0 and the move lasts 0.01 seconds
 - the planet-discovery banner and the milestone popup become short
+
+Deleting a base and the other scenes that use this camera keep the original animation. Cutting that move short hands control back before the player model and weapons have reloaded.
 
 Creature and mineral scans keep their original timing.
 

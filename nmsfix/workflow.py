@@ -7,6 +7,8 @@ from nmsfix.errors import PatchError
 from nmsfix.locations import BACKUP_DIR, INSTALLED_HASHES, WORK, game_banks
 from nmsfix.patches import CHECKS, PATCHERS, TARGETS
 
+CAMERA_FILE = "gccameraglobals.global.mbin"
+
 
 def install():
     from nmsfix.toolchain import ensure_toolchain
@@ -24,6 +26,8 @@ def install():
         print(f"Unpacking {pak_name}")
         dest = WORK / pak_name
         original_names = archives.unpack(source_pak, dest)
+        if pak_name == "NMSARC.globals.pak":
+            _restore_original_camera(dest)
         compiled = {
             relative: _patch_mbin(dest / relative, relative)
             for relative in relative_files
@@ -36,7 +40,13 @@ def install():
         archives.repack(dest / f"{pak_name}.manifest", output_pak)
         if archives.file_names(output_pak) != original_names:
             raise PatchError(f"{pak_name} file list changed during repack.")
-        untouched = next(name for name in original_names if name not in relative_files)
+        skipped = set(relative_files)
+        if pak_name == "NMSARC.globals.pak":
+            skipped.add(CAMERA_FILE)
+            vanilla_camera = archives.read_bytes(BACKUP_DIR / pak_name, CAMERA_FILE)
+            if archives.read_bytes(output_pak, CAMERA_FILE) != vanilla_camera:
+                raise PatchError("Camera globals were not restored to the original animation.")
+        untouched = next(name for name in original_names if name not in skipped)
         if archives.read_bytes(output_pak, untouched) != archives.read_bytes(source_pak, untouched):
             raise PatchError(f"Untouched file {untouched} changed inside {pak_name}.")
         _verify_pak(pak_name, output_pak, relative_files)
@@ -63,6 +73,14 @@ def restore():
         finder.replace_in_folder(BACKUP_DIR / pak_name, banks, pak_name)
     INSTALLED_HASHES.unlink(missing_ok=True)
     print("Restored the original archives. Restart No Man's Sky.")
+
+
+def _restore_original_camera(dest):
+    backup = BACKUP_DIR / "NMSARC.globals.pak"
+    if not backup.is_file():
+        raise PatchError("No original backup was found, so the camera animation cannot be restored.")
+    print("Restoring the original aerial camera animation")
+    (dest / CAMERA_FILE).write_bytes(archives.read_bytes(backup, CAMERA_FILE))
 
 
 def _patch_mbin(source_mbin, relative):

@@ -2,9 +2,6 @@ import re
 
 from nmsfix.errors import PatchError
 
-AERIAL_VALUE = re.compile(
-    r'<Property name="(Time|TimeBack|StartTime|PauseTime|LookTime|Distance)" value="[^"]*" />'
-)
 SCAN_DELAY = re.compile(
     r'(<Property name="DoAerialScan" value=")true(" />\s*'
     r'<Property name="UseMissionIDSeedForEvent" value="(?:true|false)" />\s*'
@@ -24,9 +21,11 @@ UI_TIMES = {
 }
 
 # pak name -> internal files this patch rewrites
+# The aerial camera itself stays at the game's original length. Cutting that
+# move to 0.01s returns control before the player model and weapons reload.
+# Charts skip the move entirely through DoAerialScan below.
 TARGETS = {
     "NMSARC.globals.pak": [
-        "gccameraglobals.global.mbin",
         "gcuiglobals.global.mbin",
     ],
     "NMSARC.Precache.pak": [
@@ -45,20 +44,6 @@ def set_property(text, name, value):
     return updated
 
 
-def patch_camera(text):
-    start = text.find('<Property name="AerialViewDataTable">')
-    end = text.find('<Property name="SClassLandingShakeMultiplier"', start)
-    if start < 0 or end < 0:
-        raise PatchError("AerialViewDataTable was not found in the camera globals.")
-
-    def replace(match):
-        name = match.group(1)
-        value = "0.000000" if name == "Distance" else "0.010000"
-        return f'<Property name="{name}" value="{value}" />'
-
-    return text[:start] + AERIAL_VALUE.sub(replace, text[start:end]) + text[end:]
-
-
 def patch_ui(text):
     for name, value in UI_TIMES.items():
         text = set_property(text, name, value)
@@ -66,6 +51,8 @@ def patch_ui(text):
 
 
 def patch_reward(text):
+    if 'DoAerialScan" value="true"' not in text:
+        return text
     text, delay_count = SCAN_DELAY.subn(r"\1false\g<2>0.010000\3", text)
     text, flag_count = re.subn(
         r'<Property name="DoAerialScan" value="true" />',
@@ -87,21 +74,9 @@ def check_reward(text):
         raise PatchError("Aerial scan is still enabled in the reward table.")
 
 
-def check_camera(text):
-    start = text.find('<Property name="AerialViewDataTable">')
-    end = text.find('<Property name="SClassLandingShakeMultiplier"', start)
-    section = text[start:end]
-    if 'name="Distance" value="0.000000"' not in section:
-        raise PatchError("Aerial camera distance was not zeroed.")
-    if re.search(r'name="Distance" value="(?!0\.000000")[^"]+"', section):
-        raise PatchError("An aerial camera distance is still non-zero.")
-
-
-PATCHERS["gccameraglobals.global.mbin"] = patch_camera
 PATCHERS["gcuiglobals.global.mbin"] = patch_ui
 PATCHERS["metadata/reality/tables/rewardtable.mbin"] = patch_reward
 
 CHECKS = {
-    "gccameraglobals.global.mbin": check_camera,
     "metadata/reality/tables/rewardtable.mbin": check_reward,
 }
