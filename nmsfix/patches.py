@@ -30,6 +30,12 @@ UI_TIMES = {
     "DiscoverPlanetMessageTime": "0.200000",
 }
 
+# Reward ids that must not start the fly-up. The patch still turns the flag
+# off for every other reward. R_CHART_ROBOT is the echo locator.
+REQUIRED_REWARDS = (
+    "R_CHART_ROBOT",
+)
+
 # pak name -> internal files this patch rewrites
 # The aerial camera itself stays at the game's original length. Cutting that
 # move to 0.01s returns control before the player model and weapons reload.
@@ -80,9 +86,22 @@ def patch_reward(text):
     return text
 
 
+def reward_section(text, reward_id):
+    marker = f'_id="{reward_id}">'
+    start = text.find(marker)
+    if start < 0:
+        raise PatchError(f"Reward {reward_id} was not found in the reward table.")
+    nxt = text.find('_id="', start + len(marker))
+    return text[start:] if nxt < 0 else text[start:nxt]
+
+
 def check_reward(text):
     if 'DoAerialScan" value="true"' in text:
         raise PatchError("Aerial scan is still enabled in the reward table.")
+    for reward_id in REQUIRED_REWARDS:
+        section = reward_section(text, reward_id)
+        if 'DoAerialScan" value="false"' not in section:
+            raise PatchError(f"{reward_id} does not disable the aerial camera.")
 
 
 def patch_brain(text):

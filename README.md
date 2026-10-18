@@ -4,8 +4,8 @@ This patch turns off the camera that flies upward and shows the area when you se
 
 Only data changes:
 
-- `DoAerialScan` is turned off for planetary, star, and settlement charts, so those searches never start the fly-up
-- the same flag is turned off when a Hyaline Brain points you to a monolith
+- `DoAerialScan` is turned off for planetary, star, and settlement charts, and for the echo locator, so those searches never start the fly-up
+- the same flag is turned off for every other reward that starts this camera, including when a Hyaline Brain points you to a monolith
 - the pause before that search drops from 6 seconds to 0.01
 - the planet-discovery banner and the milestone popup become short
 
